@@ -1,18 +1,20 @@
+import { ROLES } from "../helpers/roles-def";
+
 const esAdminRole = (req, res, next) => {
-  console.log(req.usuario);
   if (!req.usuario) {
     return res.status(401).json({
-      msg: "No tienes permisos para realizar esta acción",
+      msg: "No autenticado",
     });
   }
 
   const { rol, nombre } = req.usuario;
 
-  if (rol !== "ADMIN_ROLE") {
+  if (rol !== ROLES.ADMIN) {
     return res.status(403).json({
       msg: `${nombre} no es un administrador`,
     });
   }
+
   next();
 };
 
