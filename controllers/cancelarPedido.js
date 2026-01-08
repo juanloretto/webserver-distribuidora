@@ -20,17 +20,18 @@ const cancelarPedido = async (req, res) => {
       return res.status(404).json({ msg: "Pedido no encontrado" });
     }
 
-    // 🔒 Regla de negocio: solo PENDIENTE
-    if (pedido.estado !== "PENDIENTE") {
+    const estadosCancelables = ["PENDIENTE", "FACTURADO"];
+
+    if (!estadosCancelables.includes(pedido.estado)) {
       return res.status(400).json({
         msg: `No se puede cancelar un pedido en estado ${pedido.estado}`,
       });
     }
 
-    // (opcional, pero recomendado)
-    // El vendedor solo puede cancelar sus pedidos
-    if (pedido.vendedor.toString() !== usuario._id.toString()) {
-      return res.status(403).json({ msg: "No autorizado para cancelar este pedido" });
+    if (usuario.rol !== "ADMIN") {
+      return res
+        .status(403)
+        .json({ msg: "Solo un administrador puede cancelar pedidos" });
     }
 
     // 🔁 Devolver stock usando SNAPSHOT
