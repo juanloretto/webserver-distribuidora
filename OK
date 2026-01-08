@@ -1,0 +1,565 @@
+[1mdiff --git a/controllers/pedidos.js b/controllers/pedidos.js[m
+[1mindex 9a6eb86..c62d1fd 100644[m
+[1m--- a/controllers/pedidos.js[m
+[1m+++ b/controllers/pedidos.js[m
+[36m@@ -1,117 +1,164 @@[m
+ import mongoose from "mongoose";[m
+ import Pedido from "../models/pedido.js";[m
+[31m-import Usuario from "../models/usuario.js";[m
+ import Producto from "../models/producto.js";[m
+[32m+[m[32mimport Cliente from "../models/cliente.js";[m
+ [m
+[31m-// Obtener todos los pedidos[m
+[31m-const obtenerPedidos = async (req, res) => {[m
+[31m-  try {[m
+[31m-    const pedidos = await Pedido.find()[m
+[31m-      .populate("usuario", "nombre email")[m
+[31m-      .populate("menu.producto", "nombre precio");[m
+[31m-    res.json({ pedidos });[m
+[31m-  } catch (error) {[m
+[31m-    console.error(error);[m
+[31m-    res.status(500).json({ msg: "Error al obtener los pedidos" });[m
+[31m-  }[m
+[31m-};[m
+[32m+[m[32mconst crearPedido = async (req, res) => {[m
+[32m+[m[32m  const session = await mongoose.startSession();[m
+[32m+[m[32m  session.startTransaction();[m
+ [m
+[31m-// Obtener un pedido por ID[m
+[31m-const obtenerPedidoPorId = async (req, res) => {[m
+[31m-  const { id } = req.params;[m
+   try {[m
+[31m-    const pedido = await Pedido.findById(id)[m
+[31m-      .populate("usuario", "nombre email")[m
+[31m-      .populate("menu.producto", "nombre precio");[m
+[31m-    if (!pedido) {[m
+[31m-      return res.status(404).json({ msg: "Pedido no encontrado" });[m
+[32m+[m[32m    const vendedor = req.usuario; // viene del middleware JWT[m
+[32m+[m[32m    const { clienteId, clienteNuevo, items, observaciones } = req.body;[m
+[32m+[m
+[32m+[m[32m    // 🔐 Validar vendedor[m
+[32m+[m[32m    if (!vendedor) {[m
+[32m+[m[32m      await session.abortTransaction();[m
+[32m+[m[32m      session.endSession();[m
+[32m+[m[32m      return res.status(401).json({ msg: "Usuario no autenticado" });[m
+     }[m
+[31m-    res.json({ pedido });[m
+[31m-  } catch (error) {[m
+[31m-    console.error("Error al obtener el pedido:", error);[m
+[31m-    res.status(500).json({ msg: "Error al obtener el pedido" });[m
+[31m-  }[m
+[31m-};[m
+ [m
+[31m-// Crear un pedido[m
+[31m-const crearPedido = async (req, res) => {[m
+[31m-  try {[m
+[31m-    const { menu, estado } = req.body;[m
+[31m-    const usuario = req.usuario;[m
+[31m-    const usuarioExiste = await Usuario.findById(usuario);[m
+[31m-    if (!usuarioExiste) {[m
+[31m-      return res.status(401).json({ msg: "Primero debe iniciar sesión" });[m
+[32m+[m[32m    // 1️⃣ Validar items[m
+[32m+[m[32m    if (!Array.isArray(items) || items.length === 0) {[m
+[32m+[m[32m      await session.abortTransaction();[m
+[32m+[m[32m      session.endSession();[m
+[32m+[m[32m      return res.status(400).json({ msg: "El pedido debe tener productos" });[m
+     }[m
+[31m-    for (const item of menu) {[m
+[31m-      if (!mongoose.Types.ObjectId.isValid(item.producto)) {[m
+[32m+[m
+[32m+[m[32m    // 2️⃣ Resolver cliente[m
+[32m+[m[32m    let cliente;[m
+[32m+[m
+[32m+[m[32m    if (clienteId) {[m
+[32m+[m[32m      if (!mongoose.Types.ObjectId.isValid(clienteId)) {[m
+[32m+[m[32m        await session.abortTransaction();[m
+[32m+[m[32m        session.endSession();[m
+[32m+[m[32m        return res.status(400).json({ msg: "Cliente inválido" });[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      cliente = await Cliente.findOne({[m
+[32m+[m[32m        _id: clienteId,[m
+[32m+[m[32m        estado: true,[m
+[32m+[m[32m      }).session(session);[m
+[32m+[m
+[32m+[m[32m      if (!cliente) {[m
+[32m+[m[32m        await session.abortTransaction();[m
+[32m+[m[32m        session.endSession();[m
+[32m+[m[32m        return res.status(404).json({ msg: "Cliente no encontrado o inactivo" });[m
+[32m+[m[32m      }[m
+[32m+[m[32m    } else if (clienteNuevo) {[m
+[32m+[m[32m      if (!clienteNuevo.nombre) {[m
+[32m+[m[32m        await session.abortTransaction();[m
+[32m+[m[32m        session.endSession();[m
+         return res[m
+           .status(400)[m
+[31m-          .json({ msg: `ID de producto no válido: ${item.producto}` });[m
+[32m+[m[32m          .json({ msg: "El nombre del cliente es obligatorio" });[m
+       }[m
+ [m
+[31m-      const producto = await Producto.findById(item.producto);[m
+[32m+[m[32m      cliente = new Cliente({[m
+[32m+[m[32m        ...clienteNuevo,[m
+[32m+[m[32m        vendedor,[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      await cliente.save({ session });[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m      await session.abortTransaction();[m
+[32m+[m[32m      session.endSession();[m
+[32m+[m[32m      return res.status(400).json({ msg: "Debe indicar un cliente" });[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // 3️⃣ Procesar productos[m
+[32m+[m[32m    const snapshotItems = [];[m
+[32m+[m[32m    let total = 0;[m
+[32m+[m
+[32m+[m[32m    for (const item of items) {[m
+[32m+[m[32m      const { productoId, cantidad } = item;[m
+[32m+[m
+[32m+[m[32m      if ([m
+[32m+[m[32m        !mongoose.Types.ObjectId.isValid(productoId) ||[m
+[32m+[m[32m        !Number.isInteger(cantidad) ||[m
+[32m+[m[32m        cantidad < 1[m
+[32m+[m[32m      ) {[m
+[32m+[m[32m        await session.abortTransaction();[m
+[32m+[m[32m        session.endSession();[m
+[32m+[m[32m        return res[m
+[32m+[m[32m          .status(400)[m
+[32m+[m[32m          .json({ msg: "Producto o cantidad inválida" });[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      const producto = await Producto.findOne({[m
+[32m+[m[32m        _id: productoId,[m
+[32m+[m[32m        estado: true,[m
+[32m+[m[32m        disponible: true,[m
+[32m+[m[32m      }).session(session);[m
+[32m+[m
+       if (!producto) {[m
+[32m+[m[32m        await session.abortTransaction();[m
+[32m+[m[32m        session.endSession();[m
+         return res[m
+           .status(404)[m
+[31m-          .json({ msg: `Producto no encontrado: ${item.producto}` });[m
+[32m+[m[32m          .json({ msg: "Producto no disponible" });[m
+       }[m
+[31m-    }[m
+ [m
+[31m-    const nuevoPedido = new Pedido({ usuario, menu, estado });[m
+[31m-    await nuevoPedido.save();[m
+[31m-    res[m
+[31m-      .status(201)[m
+[31m-      .json({ msg: "Pedido creado exitosamente", pedido: nuevoPedido });[m
+[31m-  } catch (error) {[m
+[31m-    console.error("❌ Error en crearPedido:", error);[m
+[31m-    res[m
+[31m-      .status(500)[m
+[31m-      .json({ msg: "Error al crear el pedido", error: error.message });[m
+[31m-  }[m
+[31m-};[m
+[32m+[m[32m      if (producto.stock < cantidad) {[m
+[32m+[m[32m        await session.abortTransaction();[m
+[32m+[m[32m        session.endSession();[m
+[32m+[m[32m        return res.status(400).json({[m
+[32m+[m[32m          msg: `Stock insuficiente para ${producto.nombre}`,[m
+[32m+[m[32m        });[m
+[32m+[m[32m      }[m
+ [m
+[31m-// Actualizar un pedido[m
+[31m-const actualizarPedido = async (req, res) => {[m
+[31m-  const { id } = req.params;[m
+[32m+[m[32m      const subtotal = producto.precio * cantidad;[m
+[32m+[m[32m      total += subtotal;[m
+ [m
+[31m-  try {[m
+[31m-    const pedidoExistente = await Pedido.findById(id);[m
+[31m-    if (!pedidoExistente) {[m
+[31m-      return res.status(404).json({ msg: "Pedido no encontrado" });[m
+[32m+[m[32m      snapshotItems.push({[m
+[32m+[m[32m        producto: producto._id,[m
+[32m+[m[32m        nombre: producto.nombre,[m
+[32m+[m[32m        precio: producto.precio,[m
+[32m+[m[32m        cantidad,[m
+[32m+[m[32m        subtotal,[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      // descontar stock[m
+[32m+[m[32m      producto.stock -= cantidad;[m
+[32m+[m[32m      await producto.save({ session });[m
+     }[m
+[31m-    if (req.body.estado !== undefined) {[m
+[31m-      pedidoExistente.estado = req.body.estado; // Cambia el estado[m
+[32m+[m
+[32m+[m[32m    if (total <= 0) {[m
+[32m+[m[32m      await session.abortTransaction();[m
+[32m+[m[32m      session.endSession();[m
+[32m+[m[32m      return res.status(400).json({ msg: "Total inválido" });[m
+     }[m
+[31m-    const pedidoActualizado = await Pedido.findByIdAndUpdate(id, req.body, {[m
+[31m-      new: true,[m
+[32m+[m
+[32m+[m[32m    // 4️⃣ Crear pedido[m
+[32m+[m[32m    const pedido = new Pedido({[m
+[32m+[m[32m      vendedor,[m
+[32m+[m[32m      cliente: cliente._id,[m
+[32m+[m[32m      items: snapshotItems,[m
+[32m+[m[32m      total,[m
+[32m+[m[32m      observaciones,[m
+[32m+[m[32m      estado: "PENDIENTE",[m
+     });[m
+[31m-    if (!pedidoActualizado) {[m
+[31m-      return res.status(404).json({ msg: "Pedido no encontrado" });[m
+[31m-    }[m
+[31m-    res.json({ msg: "Pedido actualizado", pedido: pedidoActualizado });[m
+[31m-  } catch (error) {[m
+[31m-    res.status(500).json({ msg: "Error al actualizar el pedido" });[m
+[31m-  }[m
+[31m-};[m
+ [m
+[31m-// Eliminar un pedido[m
+[31m-const eliminarPedido = async (req, res) => {[m
+[31m-  const { id } = req.params;[m
+[31m-  try {[m
+[31m-    const pedidoEliminado = await Pedido.findByIdAndDelete(id);[m
+[31m-    if (!pedidoEliminado) {[m
+[31m-      return res.status(404).json({ msg: "Pedido no encontrado" });[m
+[31m-    }[m
+[31m-    res.json({ msg: "Pedido eliminado" });[m
+[32m+[m[32m    await pedido.save({ session });[m
+[32m+[m
+[32m+[m[32m    await session.commitTransaction();[m
+[32m+[m[32m    session.endSession();[m
+[32m+[m
+[32m+[m[32m    res.status(201).json({[m
+[32m+[m[32m      msg: "Pedido creado correctamente",[m
+[32m+[m[32m      pedido,[m
+[32m+[m[32m    });[m
+   } catch (error) {[m
+[31m-    res.status(500).json({ msg: "Error al eliminar el pedido" });[m
+[32m+[m[32m    await session.abortTransaction();[m
+[32m+[m[32m    session.endSession();[m
+[32m+[m
+[32m+[m[32m    console.error("❌ Error al crear pedido:", error);[m
+[32m+[m
+[32m+[m[32m    res.status(500).json({[m
+[32m+[m[32m      msg: "Error al crear el pedido",[m
+[32m+[m[32m      error: error.message,[m
+[32m+[m[32m    });[m
+   }[m
+ };[m
+ [m
+[31m-export {[m
+[31m-  obtenerPedidos,[m
+[31m-  obtenerPedidoPorId,[m
+[31m-  crearPedido,[m
+[31m-  actualizarPedido,[m
+[31m-  eliminarPedido,[m
+[31m-};[m
+[32m+[m[32mexport { crearPedido };[m
+[1mdiff --git a/index.js b/index.js[m
+[1mindex 477569a..50da2dc 100644[m
+[1m--- a/index.js[m
+[1m+++ b/index.js[m
+[36m@@ -1,34 +1,5 @@[m
+[31m-// const express = require("express");[m
+[31m-// import express from "express";[m
+[31m-// const app = express();[m
+[31m-// const port = 3223;[m
+[32m+[m[32mimport 'dotenv/config';[m
+[32m+[m[32mimport Server from "./models/server.js";[m
+ [m
+[31m-// app.get("/api", (req, res) => {[m
+[31m-//   res.send("Hola a todos ");[m
+[31m-// });[m
+[31m-// app.post("/api", (req, res) => {[m
+[31m-//   res.send("Petición POST");[m
+[31m-// });[m
+[31m-[m
+[31m-// app.put("/api/:id", (req, res) => {[m
+[31m-//   res.send("Petición PUT");[m
+[31m-// });[m
+[31m-[m
+[31m-// app.delete("/api/:id", (req, res) => {[m
+[31m-//   res.send("Petición DELETE");[m
+[31m-// });[m
+[31m-[m
+[31m-// app.use(express.static("public"))[m
+[31m-[m
+[31m-// app.listen(port, () => {[m
+[31m-//   console.log("server online, port: ", port);[m
+[31m-// });[m
+[31m-[m
+[31m-import  Server  from "./models/server.js";[m
+[31m-[m
+[31m-const server = new Server ()[m
+[31m-[m
+[31m-// console.log(process.env);[m
+[31m-[m
+[31m-//accedo al metodo listen de la clase para levantar el servidor[m
+[31m-server.listen();[m
+\ No newline at end of file[m
+[32m+[m[32mconst server = new Server();[m
+[32m+[m[32mserver.listen();[m
+[1mdiff --git a/models/pedido.js b/models/pedido.js[m
+[1mindex 9a4ec4b..c2ff133 100644[m
+[1m--- a/models/pedido.js[m
+[1m+++ b/models/pedido.js[m
+[36m@@ -1,29 +1,56 @@[m
+[31m-import { Schema, model, } from "mongoose";[m
+[31m-import mongoose from "mongoose";[m
+[31m-const PedidoSchema = Schema({[m
+[31m-  usuario: {[m
+[31m-    type: mongoose.Schema.Types.ObjectId,[m
+[31m-    ref: "Usuario",[m
+[31m-    required: true,[m
+[31m-  },[m
+[31m-  fecha: {[m
+[31m-    type: Date,[m
+[31m-    default: Date.now,[m
+[31m-  },[m
+[31m-  menu: [[m
+[31m-    {[m
+[31m-      producto: {[m
+[31m-        type: mongoose.Schema.Types.ObjectId,[m
+[31m-        ref: "Producto",[m
+[31m-        required: true,[m
+[31m-      }[m
+[32m+[m[32mimport { Schema, model } from "mongoose";[m
+[32m+[m
+[32m+[m[32mconst PedidoSchema = new Schema([m
+[32m+[m[32m  {[m
+[32m+[m[32m    vendedor: {[m
+[32m+[m[32m      type: Schema.Types.ObjectId,[m
+[32m+[m[32m      ref: "Usuario",[m
+[32m+[m[32m      required: true,[m
+     },[m
+[31m-  ],[m
+ [m
+[31m-  estado: {[m
+[31m-    type: Boolean,[m
+[31m-    default: "true",[m
+[32m+[m[32m    cliente: {[m
+[32m+[m[32m      type: Schema.Types.ObjectId,[m
+[32m+[m[32m      ref: "Cliente",[m
+[32m+[m[32m      required: true,[m
+[32m+[m[32m    },[m
+[32m+[m
+[32m+[m[32m    items: [[m
+[32m+[m[32m      {[m
+[32m+[m[32m        producto: {[m
+[32m+[m[32m          type: Schema.Types.ObjectId,[m
+[32m+[m[32m          ref: "Producto",[m
+[32m+[m[32m          required: true,[m
+[32m+[m[32m        },[m
+[32m+[m[32m        nombre: String, // snapshot para Excel[m
+[32m+[m[32m        precio: Number, // precio al momento del pedido[m
+[32m+[m[32m        cantidad: {[m
+[32m+[m[32m          type: Number,[m
+[32m+[m[32m          required: true,[m
+[32m+[m[32m          min: 1,[m
+[32m+[m[32m        },[m
+[32m+[m[32m        subtotal: Number,[m
+[32m+[m[32m      },[m
+[32m+[m[32m    ],[m
+[32m+[m
+[32m+[m[32m    total: {[m
+[32m+[m[32m      type: Number,[m
+[32m+[m[32m      default: 0,[m
+[32m+[m[32m    },[m
+[32m+[m
+[32m+[m[32m    estado: {[m
+[32m+[m[32m      type: String,[m
+[32m+[m[32m      enum: ["PENDIENTE", "FACTURADO", "ENTREGADO", "CANCELADO"],[m
+[32m+[m[32m      default: "PENDIENTE",[m
+[32m+[m[32m    },[m
+[32m+[m
+[32m+[m[32m    observaciones: {[m
+[32m+[m[32m      type: String,[m
+[32m+[m[32m      trim: true,[m
+[32m+[m[32m    },[m
+   },[m
+[31m-});[m
+[32m+[m[32m  {[m
+[32m+[m[32m    timestamps: true, // createdAt = fecha y hora exacta[m
+[32m+[m[32m  }[m
+[32m+[m[32m);[m
+ [m
+ export default model("Pedido", PedidoSchema);[m
+[1mdiff --git a/models/producto.js b/models/producto.js[m
+[1mindex b1c9639..cded93c 100644[m
+[1m--- a/models/producto.js[m
+[1m+++ b/models/producto.js[m
+[36m@@ -9,11 +9,6 @@[m [mconst ProductoSchema = Schema({[m
+     type: Boolean,[m
+     default: true,[m
+   },[m
+[31m-  usuario: {[m
+[31m-    type: Schema.Types.ObjectId,[m
+[31m-    ref: "Usuario",[m
+[31m-    required: true,[m
+[31m-  },[m
+   categoria: {[m
+     type: Schema.Types.ObjectId,[m
+     ref: "Categoria",[m
+[36m@@ -26,10 +21,6 @@[m [mconst ProductoSchema = Schema({[m
+   descripcion: {[m
+     type: String,[m
+   },[m
+[31m-  disponible: {[m
+[31m-    type: Boolean,[m
+[31m-    default: true,[m
+[31m-  },[m
+   img: {[m
+     type: String,[m
+     default:[m
+[36m@@ -39,6 +30,12 @@[m [mconst ProductoSchema = Schema({[m
+     type: Number,[m
+     default: 0,[m
+   },[m
+[32m+[m[32m  codigo: {[m
+[32m+[m[32m  type: String,[m
+[32m+[m[32m  unique: true,[m
+[32m+[m[32m  required: true,[m
+[32m+[m[32m}[m
+[32m+[m
+ });[m
+ [m
+ export default model("Producto", ProductoSchema);[m
+\ No newline at end of file[m
+[1mdiff --git a/models/rol.js b/models/rol.js[m
+[1mdeleted file mode 100644[m
+[1mindex a274f1a..0000000[m
+[1m--- a/models/rol.js[m
+[1m+++ /dev/null[m
+[36m@@ -1,11 +0,0 @@[m
+[31m-import { Schema, model } from "mongoose";[m
+[31m-[m
+[31m-const RolSchema = new Schema({[m
+[31m-    rol: {[m
+[31m-        type:String,[m
+[31m-        required:[true,"El rol debe ser obligatorio"][m
+[31m-[m
+[31m-    }[m
+[31m-})[m
+[31m-[m
+[31m-export default model ("role", RolSchema)[m
+\ No newline at end of file[m
+[1mdiff --git a/models/usuario.js b/models/usuario.js[m
+[1mindex 2391e5e..b99a53e 100644[m
+[1m--- a/models/usuario.js[m
+[1m+++ b/models/usuario.js[m
+[36m@@ -1,41 +1,40 @@[m
+ import { Schema, model } from "mongoose";[m
+ [m
+[31m-const UsuarioSchema = new Schema({[m
+[31m-  nombre: {[m
+[31m-    type: String,[m
+[31m-    required: [true, "El nombre es obligatorio"],[m
+[32m+[m[32mconst UsuarioSchema = new Schema([m
+[32m+[m[32m  {[m
+[32m+[m[32m    nombre: {[m
+[32m+[m[32m      type: String,[m
+[32m+[m[32m      required: true,[m
+[32m+[m[32m    },[m
+[32m+[m[32m    email: {[m
+[32m+[m[32m      type: String,[m
+[32m+[m[32m      required: true,[m
+[32m+[m[32m      unique: true,[m
+[32m+[m[32m    },[m
+[32m+[m[32m    password: {[m
+[32m+[m[32m      type: String,[m
+[32m+[m[32m      required: true,[m
+[32m+[m[32m      select: false, // nunca se devuelve[m
+[32m+[m[32m    },[m
+[32m+[m[32m    rol: {[m
+[32m+[m[32m      type: String,[m
+[32m+[m[32m      enum: ["ADMIN", "USUARIO"],[m
+[32m+[m[32m      required: true,[m
+[32m+[m[32m    },[m
+[32m+[m[32m    estado: {[m
+[32m+[m[32m      type: Boolean,[m
+[32m+[m[32m      default: true,[m
+[32m+[m[32m    },[m
+   },[m
+[31m-  email: {[m
+[31m-    type: String,[m
+[31m-    required: [true, "El email es obligatorio"],[m
+[31m-    unique: true,[m
+[32m+[m[32m  {[m
+[32m+[m[32m    timestamps: true,[m
+   },[m
+[31m-  password: {[m
+[31m-    type: String,[m
+[31m-    required: [true, "La contraseña es obligatoria"],[m
+[31m-  },[m
+[31m-  img: {[m
+[31m-    type: String,[m
+[31m-    default:[m
+[31m-      "https://ceslava.s3-accelerate.amazonaws.com/2016/04/mistery-man-gravatar-wordpress-avatar-persona-misteriosa-510x510.png",[m
+[31m-  },[m
+[31m-  rol: {[m
+[31m-    type: String,[m
+[31m-    required: true,[m
+[31m-    // default:"USER_ROLE"[m
+[31m-  },[m
+[31m-  estado: {[m
+[31m-    type: Boolean,[m
+[31m-    default: true,[m
+[31m-  },[m
+[31m-});[m
+[31m-[m
+[32m+[m[41m   [m
+[32m+[m[32m);[m
+ UsuarioSchema.methods.toJSON = function () {[m
+[31m-  //aqui modificamos lo que queremos que el modelo muestre o no[m
+[31m-[m
+   const { password, ...usuario } = this.toObject();[m
+[31m-[m
+   return usuario;[m
+ };[m
+ [m
+[32m+[m
+ export default model("Usuario", UsuarioSchema);[m
+[1mdiff --git a/package-lock.json b/package-lock.json[m
+[1mindex 4e2eab4..36a46e0 100644[m
+[1m--- a/package-lock.json[m
+[1m+++ b/package-lock.json[m
+[36m@@ -11,6 +11,7 @@[m
+       "dependencies": {[m
+         "bcryptjs": "^2.4.3",[m
+         "cors": "^2.8.5",[m
+[32m+[m[32m        "dotenv": "^17.2.3",[m
+         "express": "^4.21.2",[m
+         "express-validator": "^7.2.0",[m
+         "jsonwebtoken": "^9.0.2",[m
+[36m@@ -227,6 +228,18 @@[m
+         "npm": "1.2.8000 || >= 1.4.16"[m
+       }[m
+     },[m
+[32m+[m[32m    "node_modules/dotenv": {[m
+[32m+[m[32m      "version": "17.2.3",[m
+[32m+[m[32m      "resolved": "https://registry.npmjs.org/dotenv/-/dotenv-17.2.3.tgz",[m
+[32m+[m[32m      "integrity": "sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==",[m
+[32m+[m[32m      "license": "BSD-2-Clause",[m
+[32m+[m[32m      "engines": {[m
+[32m+[m[32m        "node": ">=12"[m
+[32m+[m[32m      },[m
+[32m+[m[32m      "funding": {[m
+[32m+[m[32m        "url": "https://dotenvx.com"[m
+[32m+[m[32m      }[m
+[32m+[m[32m    },[m
+     "node_modules/ecdsa-sig-formatter": {[m
+       "version": "1.0.11",[m
+       "resolved": "https://registry.npmjs.org/ecdsa-sig-formatter/-/ecdsa-sig-formatter-1.0.11.tgz",[m
+[1mdiff --git a/package.json b/package.json[m
+[1mindex 0f9a045..15273ea 100644[m
+[1m--- a/package.json[m
+[1m+++ b/package.json[m
+[36m@@ -14,6 +14,7 @@[m
+   "dependencies": {[m
+     "bcryptjs": "^2.4.3",[m
+     "cors": "^2.8.5",[m
+[32m+[m[32m    "dotenv": "^17.2.3",[m
+     "express": "^4.21.2",[m
+     "express-validator": "^7.2.0",[m
+     "jsonwebtoken": "^9.0.2",[m

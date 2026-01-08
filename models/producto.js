@@ -9,11 +9,6 @@ const ProductoSchema = Schema({
     type: Boolean,
     default: true,
   },
-  usuario: {
-    type: Schema.Types.ObjectId,
-    ref: "Usuario",
-    required: true,
-  },
   categoria: {
     type: Schema.Types.ObjectId,
     ref: "Categoria",
@@ -26,10 +21,6 @@ const ProductoSchema = Schema({
   descripcion: {
     type: String,
   },
-  disponible: {
-    type: Boolean,
-    default: true,
-  },
   img: {
     type: String,
     default:
@@ -39,6 +30,12 @@ const ProductoSchema = Schema({
     type: Number,
     default: 0,
   },
+  codigo: {
+  type: String,
+  unique: true,
+  required: true,
+}
+
 });
 
 export default model("Producto", ProductoSchema);

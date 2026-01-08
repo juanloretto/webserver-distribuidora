@@ -1,117 +1,167 @@
 import mongoose from "mongoose";
 import Pedido from "../models/pedido.js";
-import Usuario from "../models/usuario.js";
 import Producto from "../models/producto.js";
+import Cliente from "../models/cliente.js";
 
-// Obtener todos los pedidos
-const obtenerPedidos = async (req, res) => {
-  try {
-    const pedidos = await Pedido.find()
-      .populate("usuario", "nombre email")
-      .populate("menu.producto", "nombre precio");
-    res.json({ pedidos });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ msg: "Error al obtener los pedidos" });
-  }
-};
-
-// Obtener un pedido por ID
-const obtenerPedidoPorId = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const pedido = await Pedido.findById(id)
-      .populate("usuario", "nombre email")
-      .populate("menu.producto", "nombre precio");
-    if (!pedido) {
-      return res.status(404).json({ msg: "Pedido no encontrado" });
-    }
-    res.json({ pedido });
-  } catch (error) {
-    console.error("Error al obtener el pedido:", error);
-    res.status(500).json({ msg: "Error al obtener el pedido" });
-  }
-};
-
-// Crear un pedido
 const crearPedido = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const { menu, estado } = req.body;
-    const usuario = req.usuario;
-    const usuarioExiste = await Usuario.findById(usuario);
-    if (!usuarioExiste) {
-      return res.status(401).json({ msg: "Primero debe iniciar sesión" });
+    const vendedor = req.usuario; // viene del middleware JWT
+    const { clienteId, clienteNuevo, items, observaciones } = req.body;
+
+    // 🔐 Validar vendedor
+    if (!vendedor) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(401).json({ msg: "Usuario no autenticado" });
     }
-    for (const item of menu) {
-      if (!mongoose.Types.ObjectId.isValid(item.producto)) {
+
+    // 1️⃣ Validar items
+    if (!Array.isArray(items) || items.length === 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "El pedido debe tener productos" });
+    }
+
+    // 2️⃣ Resolver cliente
+    let cliente;
+
+    if (clienteId) {
+      if (!mongoose.Types.ObjectId.isValid(clienteId)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ msg: "Cliente inválido" });
+      }
+
+      cliente = await Cliente.findOne({
+        _id: clienteId,
+        estado: true,
+      }).session(session);
+
+      if (!cliente) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(404).json({ msg: "Cliente no encontrado o inactivo" });
+      }
+    } else if (clienteNuevo) {
+      if (!clienteNuevo.nombre) {
+        await session.abortTransaction();
+        session.endSession();
         return res
           .status(400)
-          .json({ msg: `ID de producto no válido: ${item.producto}` });
+          .json({ msg: "El nombre del cliente es obligatorio" });
       }
 
-      const producto = await Producto.findById(item.producto);
+      cliente = new Cliente({
+        ...clienteNuevo,
+        vendedor,
+      });
+
+      await cliente.save({ session });
+    } else {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "Debe indicar un cliente" });
+    }
+
+    // 3️⃣ Procesar productos
+    const snapshotItems = [];
+    let total = 0;
+
+    for (const item of items) {
+      const { productoId, cantidad } = item;
+
+      if (
+        !mongoose.Types.ObjectId.isValid(productoId) ||
+        !Number.isInteger(cantidad) ||
+        cantidad < 1
+      ) {
+        await session.abortTransaction();
+        session.endSession();
+        return res
+          .status(400)
+          .json({ msg: "Producto o cantidad inválida" });
+      }
+
+      const producto = await Producto.findOne({
+        _id: productoId,
+        estado: true,
+        disponible: true,
+      }).session(session);
+
       if (!producto) {
+        await session.abortTransaction();
+        session.endSession();
         return res
           .status(404)
-          .json({ msg: `Producto no encontrado: ${item.producto}` });
+          .json({ msg: "Producto no disponible" });
       }
+
+      if (producto.stock < cantidad) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          msg: `Stock insuficiente para ${producto.nombre}`,
+        });
+      }
+
+      const subtotal = producto.precio * cantidad;
+      total += subtotal;
+
+      snapshotItems.push({
+        producto: producto._id,
+        nombre: producto.nombre,
+        precio: producto.precio,
+        cantidad,
+        subtotal,
+      });
+
+      // descontar stock
+      producto.stock -= cantidad;
+      await producto.save({ session });
     }
 
-    const nuevoPedido = new Pedido({ usuario, menu, estado });
-    await nuevoPedido.save();
-    res
-      .status(201)
-      .json({ msg: "Pedido creado exitosamente", pedido: nuevoPedido });
-  } catch (error) {
-    console.error("❌ Error en crearPedido:", error);
-    res
-      .status(500)
-      .json({ msg: "Error al crear el pedido", error: error.message });
-  }
-};
-
-// Actualizar un pedido
-const actualizarPedido = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const pedidoExistente = await Pedido.findById(id);
-    if (!pedidoExistente) {
-      return res.status(404).json({ msg: "Pedido no encontrado" });
+    if (total <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "Total inválido" });
     }
-    if (req.body.estado !== undefined) {
-      pedidoExistente.estado = req.body.estado; // Cambia el estado
-    }
-    const pedidoActualizado = await Pedido.findByIdAndUpdate(id, req.body, {
-      new: true,
+
+    // 4️⃣ Crear pedido
+    const pedido = new Pedido({
+      vendedor,
+      cliente: cliente._id,
+      items: snapshotItems,
+      total,
+      observaciones,
+      estado: "PENDIENTE",
     });
-    if (!pedidoActualizado) {
-      return res.status(404).json({ msg: "Pedido no encontrado" });
-    }
-    res.json({ msg: "Pedido actualizado", pedido: pedidoActualizado });
+
+    await pedido.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(201).json({
+      msg: "Pedido creado correctamente",
+      pedido,
+    });
   } catch (error) {
-    res.status(500).json({ msg: "Error al actualizar el pedido" });
+    if (session.inTransaction()) {
+  await session.abortTransaction();
+}
+session.endSession();
+
+
+    console.error("❌ Error al crear pedido:", error);
+
+    res.status(500).json({
+      msg: "Error al crear el pedido",
+      error: error.message,
+    });
   }
 };
 
-// Eliminar un pedido
-const eliminarPedido = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const pedidoEliminado = await Pedido.findByIdAndDelete(id);
-    if (!pedidoEliminado) {
-      return res.status(404).json({ msg: "Pedido no encontrado" });
-    }
-    res.json({ msg: "Pedido eliminado" });
-  } catch (error) {
-    res.status(500).json({ msg: "Error al eliminar el pedido" });
-  }
-};
-
-export {
-  obtenerPedidos,
-  obtenerPedidoPorId,
-  crearPedido,
-  actualizarPedido,
-  eliminarPedido,
-};
+export { crearPedido };
