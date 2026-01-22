@@ -3,24 +3,20 @@ import Producto from "../models/producto.js";
 
 //Get para traer todos los productos paginados--------------------
 const obtenerProductos = async (req = request, res = response) => {
-  // const { limite = 5, desde = 0 } = req.query;
-  // const query = { estado: true };
-  const { estado } = req.query; // estado ya es booleano
-  // Si estado está definido, filtra por estado; si no, trae todos los productos
-  const query = estado !== undefined ? { estado } : {};
+  let query = {};
+
+  if (req.query.estado !== undefined) {
+    query.estado = req.query.estado === "true";
+  }
 
   const productos = await Producto.find(query)
-    // .skip(Number(desde))
-    // .limit(Number(limite))
     .populate("categoria", "nombre")
     .populate("usuario", "email");
 
   const total = await Producto.countDocuments(query);
 
-  res.json({
-    total,
-    productos,
-  });
+  res.json({ total, productos });
+
 };
 
 //--------------------------------------------------------------
