@@ -94,3 +94,12 @@ La cancelación cumple las siguientes reglas:
 - MongoDB con **Replica Set** es obligatorio para transacciones
 - Se utilizan sesiones (`mongoose.startSession`)
 - Los productos del pedido se guardan como snapshot para evitar cambios futuros
+
+## Transiciones PROHIBIDAS
+
+| Desde     | Hacia        | Motivo         |
+| --------- | ------------ | -------------- |
+| ENTREGADO | *cualquiera* | Pedido cerrado |
+| CANCELADO | *cualquiera* | Estado final   |
+| FACTURADO | PENDIENTE    | Inconsistencia |
+| ENTREGADO | CANCELADO    | Error grave    |

@@ -110,8 +110,10 @@ const crearPedido = async (req, res) => {
       const subtotal = producto.precio * cantidad;
       total += subtotal;
 
-      snapshotItems.push({
-        producto: producto._id,
+      // 📸 SNAPSHOT (clave del sistema)
+       snapshotItems.push({
+        producto: producto._id,   // interno
+        codigo: producto.codigo,  // 🔑 externo (Excel / facturación)
         nombre: producto.nombre,
         precio: producto.precio,
         cantidad,
