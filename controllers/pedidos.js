@@ -188,6 +188,22 @@ const obtenerPedidosAdmin = async (req, res) => {
     pedidos,
   });
 };
+const obtenerPedidosVendedor= async (req, res) => {
+  const vendedorId = req.usuario._id;
+  const { estado } = req.query;
+
+  const query = { vendedor: vendedorId };
+  if (estado) query.estado = estado;
+
+  const pedidos = await Pedido.find(query)
+    .populate("cliente", "nombre")
+    .sort({ createdAt: -1 });
+
+  res.json({
+    total: pedidos.length,
+    pedidos,
+  });
+};
 
 
-export { crearPedido, obtenerPedidosAdmin };
+export { crearPedido, obtenerPedidosAdmin, obtenerPedidosVendedor };
