@@ -16,7 +16,6 @@ const obtenerProductos = async (req = request, res = response) => {
   const total = await Producto.countDocuments(query);
 
   res.json({ total, productos });
-
 };
 
 //--------------------------------------------------------------
@@ -24,9 +23,15 @@ const obtenerProductos = async (req = request, res = response) => {
 const obtenerProducto = async (req = request, res = response) => {
   const { id } = req.params;
 
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ msg: "ID inválido" });
+  }
   const producto = await Producto.findById(id)
     .populate("categoria", "nombre")
     .populate("usuario", "email");
+  if (!producto) {
+    return res.status(404).json({ msg: "Producto no encontrado" });
+  }
 
   res.json({
     producto,
@@ -83,10 +88,10 @@ const actualizarProducto = async (req = request, res = response) => {
   }
 
   // Si el estado viene en false, lo cambiamos a true
-  let nuevoEstado = estado;
-  if (productoDB.estado === false) {
-    nuevoEstado = true;
-  }
+  //let nuevoEstado = estado;
+  //if (productoDB.estado === false) {
+    //nuevoEstado = true;
+  //}
   //guardamos id de usuario
   const usuario = req.usuario._id;
 
@@ -97,9 +102,9 @@ const actualizarProducto = async (req = request, res = response) => {
     categoria,
     disponible,
     usuario,
-    estado:nuevoEstado,
+    estado: nuevoEstado,
   };
-  
+
   //si viene el nombre al momento de actualizar
   if (req.body.nombre) {
     data.nombre = req.body.nombre.toUpperCase();
