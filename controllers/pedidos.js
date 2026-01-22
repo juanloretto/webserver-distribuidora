@@ -164,4 +164,30 @@ session.endSession();
   }
 };
 
-export { crearPedido };
+const obtenerPedidosAdmin = async (req, res) => {
+  const { estado, vendedor, desde, hasta } = req.query;
+
+  const query = {};
+
+  if (estado) query.estado = estado;
+  if (vendedor) query.vendedor = vendedor;
+
+  if (desde || hasta) {
+    query.createdAt = {};
+    if (desde) query.createdAt.$gte = new Date(desde);
+    if (hasta) query.createdAt.$lte = new Date(hasta);
+  }
+
+  const pedidos = await Pedido.find(query)
+    .populate("cliente", "nombre")
+    .populate("vendedor", "nombre email")
+    .sort({ createdAt: -1 });
+
+  res.json({
+    total: pedidos.length,
+    pedidos,
+  });
+};
+
+
+export { crearPedido, obtenerPedidosAdmin };
