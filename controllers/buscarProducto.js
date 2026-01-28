@@ -5,17 +5,17 @@ const { ObjectId } = mongoose.Types;
 
 import Producto from "../models/producto.js";
 
-
 // buscar productos
-const buscarProducto = async (termino, res = response) => {
-  //verificar si en vez del nombre me manda el id
-  //con esto valido si el termino que manda el front es un id y lo valido
+const buscarProducto = async (req = request, res = response) => {
+  const { termino } = req.params;
+
   const isMongoId = ObjectId.isValid(termino);
 
   if (isMongoId) {
-    const producto = await Producto.findById(termino)
-      .populate("categoria", "nombre");
-    //si categoria obtuvo algo que me devuelva en un array la categoria, sino que me devuelva un  array vacio
+    const producto = await Producto.findById(termino).populate(
+      "categoria",
+      "nombre",
+    );
     return res.json({
       results: producto ? [producto] : [],
     });
@@ -25,10 +25,7 @@ const buscarProducto = async (termino, res = response) => {
 
   const productos = await Producto.find({
     estado: true,
-    $or: [
-      { nombre: regex },
-      { codigo: regex },
-    ],
+    $or: [{ nombre: regex }, { codigo: regex }],
   })
     .populate("categoria", "nombre")
     .limit(10);
@@ -38,21 +35,4 @@ const buscarProducto = async (termino, res = response) => {
   });
 };
 
-
-  switch (coleccion) {
-    case "categorias":
-      buscarCategoria(termino, res);
-      break;
-    case "productos":
-      buscarProducto(termino, res);
-      break;
-
-    default:
-      res.status(500).json({
-        msg: "No se generaron las búsquedas",
-      });
-      break;
-  }
-
-
-export default buscar;
+export default buscarProducto;
