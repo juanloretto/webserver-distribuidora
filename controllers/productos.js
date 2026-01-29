@@ -64,11 +64,20 @@ const productoPost = async (req, res) => {
   const producto = new Producto(data);
 
   //grabar en la base de datos
+  try {
+  const producto = new Producto(req.body);
   await producto.save();
-
-  res.status(201).json({
-    msg: "Se agregó producto",
+  
+  return res.status(201).json({
+    msg: "producto creado con exito",
+    producto});
+  
+} catch (error) {
+  res.status(400).json({
+    msg: "Error al crear producto",
+    error: error.message
   });
+}
 };
 
 //actualizarProducto (validar nombre)-----------------------------------------
