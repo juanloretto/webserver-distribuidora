@@ -16,7 +16,7 @@ const login = async (req, res) => {
     //verificar si el usuario esta activo
     if (!usuario.estado) {
         return res.status(400).json({
-            msg:"Correo / contraseña no son correctas"
+            msg:"El usuario se encuentra inactivo"
         })
     }
 

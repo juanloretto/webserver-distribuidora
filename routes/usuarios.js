@@ -14,17 +14,11 @@ import {
   emailExiste,
   existeUsuarioPorId,
   rolValido,
-  
 } from "../helpers/db-validators.js";
 
 const router = Router();
 
-
-
-router.get("/",[
-  validarJWT,
-  esAdminRole
-], getUsers);
+router.get("/", [validarJWT, esAdminRole], getUsers);
 
 router.get(
   "/:id",
@@ -34,7 +28,7 @@ router.get(
     check("id").custom(existeUsuarioPorId),
     validarCampos,
   ],
-  getUser
+  getUser,
 );
 
 router.post(
@@ -43,16 +37,16 @@ router.post(
     check("nombre", "El nombre es obligatorio").notEmpty(),
     check(
       "password",
-      "La contraseña debe tener mínimo 8 caracteres,mayusculas,minusculas,numeros y simbolos especiales"
+      "La contraseña debe tener mínimo 8 caracteres,mayusculas,minusculas,numeros y simbolos especiales",
     ).matches(
-      /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+      /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
     ),
     check("email", "El email no es valido").isEmail(),
     check("email").custom(emailExiste),
     check("rol").custom(rolValido),
     validarCampos,
   ],
-  postUsers
+  postUsers,
 );
 
 router.put(
@@ -60,10 +54,10 @@ router.put(
   [
     validarJWT,
     check("id", "No es un id válido").isMongoId(),
-    check('id').custom(existeUsuarioPorId),
-    validarCampos
+    check("id").custom(existeUsuarioPorId),
+    validarCampos,
   ],
-  putUsers
+  putUsers,
 );
 
 router.delete(
@@ -75,7 +69,7 @@ router.delete(
     check("id").custom(existeUsuarioPorId),
     validarCampos,
   ],
-  deleteUsers
+  deleteUsers,
 );
 
 export default router;
