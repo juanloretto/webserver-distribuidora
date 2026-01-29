@@ -1,11 +1,12 @@
-import Role from "../models/rol.js";
+import { ROLES } from "./roles-def.js";
+
 import Usuario from "../models/usuario.js";
 import Producto from "../models/producto.js"
 
-const rolValido = async (rol) => {
-  //buscara el rol dentro de la coleccion
-  const esRolValido = await Role.findOne({ rol });
-  if (!esRolValido) {
+const rolValido = async (rol = "") => {
+  const rolesValidos = Object.values(ROLES);
+
+  if (!rolesValidos.includes(rol)) {
     throw new Error(`${rol} no es un rol válido`);
   }
 };

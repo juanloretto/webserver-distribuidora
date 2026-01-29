@@ -1,4 +1,4 @@
-import { ROLES } from "../helpers/roles-def";
+import { ROLES } from "../helpers/roles-def.js";
 
 const esAdminRole = (req, res, next) => {
   if (!req.usuario) {

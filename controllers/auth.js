@@ -6,7 +6,8 @@ const login = async (req, res) => {
   const { email, password } = req.body;
   try {
     //verificar si existe el email
-    const usuario = await Usuario.findOne({email}) 
+    const usuario = await Usuario.findOne({ email }).select("+password");
+
     if (!usuario) {
         return res.status(400).json({
             msg:"Correo / contraseña no son correctas"
@@ -35,10 +36,11 @@ const login = async (req, res) => {
         token
     })
   } catch (error) {
-    res.status(500).json({
-      message: "comuniquese con el administrador",
-    });
-  }
+  console.error("ERROR LOGIN 👉", error);
+  res.status(500).json({
+    message: "comuniquese con el administrador",
+  });
+}
 };
 
 export { login };
