@@ -24,6 +24,6 @@ routerPedido.put("/:id/cancelar", validarJWT, cancelarPedido);
 
 routerPedido.put("/:id/estado", validarJWT, cambiarEstadoPedido);
 
-router.get("/metricas", [validarJWT, esAdminRole], metricasPedidos);
+routerPedido.get("/metricas", [validarJWT, esAdminRole], metricasPedidos);
 
 export default routerPedido;
