@@ -6,9 +6,9 @@ import buscarCategoria from "../controllers/buscarCategoria.js";
 
 const router = Router();
 
-// 🔍 Búsquedas
 router.use(validarJWT);
 
+// 🔍 Búsquedas
 router.get("/productos/:termino", buscarProducto);
 router.get("/clientes/:termino", buscarCliente);
 router.get("/categorias/:termino", buscarCategoria);

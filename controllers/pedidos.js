@@ -43,7 +43,9 @@ const crearPedido = async (req, res) => {
       if (!cliente) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(404).json({ msg: "Cliente no encontrado o inactivo" });
+        return res
+          .status(404)
+          .json({ msg: "Cliente no encontrado o inactivo" });
       }
     } else if (clienteNuevo) {
       if (!clienteNuevo.nombre) {
@@ -80,23 +82,18 @@ const crearPedido = async (req, res) => {
       ) {
         await session.abortTransaction();
         session.endSession();
-        return res
-          .status(400)
-          .json({ msg: "Producto o cantidad inválida" });
+        return res.status(400).json({ msg: "Producto o cantidad inválida" });
       }
 
       const producto = await Producto.findOne({
         _id: productoId,
         estado: true,
-        disponible: true,
       }).session(session);
 
       if (!producto) {
         await session.abortTransaction();
         session.endSession();
-        return res
-          .status(404)
-          .json({ msg: "Producto no disponible" });
+        return res.status(404).json({ msg: "Producto no disponible" });
       }
 
       if (producto.stock < cantidad) {
@@ -111,9 +108,9 @@ const crearPedido = async (req, res) => {
       total += subtotal;
 
       // 📸 SNAPSHOT (clave del sistema)
-       snapshotItems.push({
-        producto: producto._id,   // interno
-        codigo: producto.codigo,  // 🔑 externo (Excel / facturación)
+      snapshotItems.push({
+        producto: producto._id, // interno
+        codigo: producto.codigo, // 🔑 externo (Excel / facturación)
         nombre: producto.nombre,
         precio: producto.precio,
         cantidad,
@@ -152,10 +149,9 @@ const crearPedido = async (req, res) => {
     });
   } catch (error) {
     if (session.inTransaction()) {
-  await session.abortTransaction();
-}
-session.endSession();
-
+      await session.abortTransaction();
+    }
+    session.endSession();
 
     console.error("❌ Error al crear pedido:", error);
 
@@ -190,22 +186,38 @@ const obtenerPedidosAdmin = async (req, res) => {
     pedidos,
   });
 };
-const obtenerPedidosVendedor= async (req, res) => {
-  const vendedorId = req.usuario._id;
-  const { estado } = req.query;
+const obtenerPedidosVendedor = async (req, res) => {
+  try {
+    const vendedorId = req.usuario?._id;
+    const { estado } = req.query;
 
-  const query = { vendedor: vendedorId };
-  if (estado) query.estado = estado;
+    if (!vendedorId) {
+      return res.status(401).json({
+        msg: "Usuario no autenticado",
+      });
+    }
 
-  const pedidos = await Pedido.find(query)
-    .populate("cliente", "nombre")
-    .sort({ createdAt: -1 });
+    const query = { vendedor: vendedorId };
+    if (estado) query.estado = estado;
 
-  res.json({
-    total: pedidos.length,
-    pedidos,
-  });
+    const pedidos = await Pedido.find(query)
+      .populate("cliente", "nombre")
+      .sort({ createdAt: -1 });
+
+    res.json({
+      total: pedidos.length,
+      pedidos,
+    });
+  } catch (error) {
+    console.error("❌ Error al obtener pedidos del vendedor:", error);
+
+    res.status(500).json({
+      msg: "Error al obtener los pedidos",
+      error: error.message,
+    });
+  }
 };
+
 
 
 export { crearPedido, obtenerPedidosAdmin, obtenerPedidosVendedor };
