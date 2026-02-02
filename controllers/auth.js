@@ -1,5 +1,5 @@
 import Usuario from "../models/usuario.js";
-import bcrypt from "bcryptjs"
+import bcrypt from "bcryptjs";
 import { generarJWT } from "../helpers/genera-jwt.js";
 
 const login = async (req, res) => {
@@ -9,38 +9,43 @@ const login = async (req, res) => {
     const usuario = await Usuario.findOne({ email }).select("+password");
 
     if (!usuario) {
-        return res.status(400).json({
-            msg:"Correo / contraseña no son correctas"
-        })
+      return res.status(400).json({
+        msg: "Correo / contraseña no son correctas",
+      });
     }
     //verificar si el usuario esta activo
     if (!usuario.estado) {
-        return res.status(400).json({
-            msg:"El usuario se encuentra inactivo"
-        })
+      return res.status(400).json({
+        msg: "El usuario se encuentra inactivo",
+      });
     }
 
     //verificar la contraseña
-    const validPassword = bcrypt.compareSync(password,usuario.password)
+    const validPassword = bcrypt.compareSync(password, usuario.password);
     if (!validPassword) {
-        return res.status(400).json({
-            msg:"Correo / contraseña no son correctas"
-        })
+      return res.status(400).json({
+        msg: "Correo / contraseña no son correctas",
+      });
     }
     //generar el token
-    const token = await generarJWT(usuario._id)
+    const token = await generarJWT(usuario._id, usuario.rol);
 
-    res.status(202).json({
-        msg:"Login ok",
+    res.status(200).json({
+      msg: "Login ok",
+      token,
+      usuario: {
         uid: usuario._id,
-        token
-    })
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol,
+      },
+    });
   } catch (error) {
-  console.error("ERROR LOGIN 👉", error);
-  res.status(500).json({
-    message: "comuniquese con el administrador",
-  });
-}
+    console.error("ERROR LOGIN 👉", error);
+    res.status(500).json({
+      message: "comuniquese con el administrador",
+    });
+  }
 };
 
 export { login };

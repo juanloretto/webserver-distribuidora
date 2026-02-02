@@ -29,7 +29,7 @@ const getUser = async (req, res = response) => {
         .json({ msg: `Usuario con id ${id} no encontrado` });
     }
         if (
-      usuarioAuth.rol !== "ADMIN_ROLE" &&
+      usuarioAuth.rol !== "ADMIN_ROLE" &&  
       usuarioAuth._id.toString() !== id
     ) {
       return res.status(403).json({

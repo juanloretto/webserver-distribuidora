@@ -6,13 +6,14 @@ import { login } from "../controllers/auth.js";
 //creamos una instancia de router
 const routerAuth = Router();
 
-routerAuth.post("/login",[
-    check("email","El correo es obligatorio").isEmail(),
-    check("password","La contraseña es obligatoria").notEmpty(),
-    validarCampos
-],login)
+routerAuth.post(
+  "/login",
+  [
+    check("email", "El correo es obligatorio").isEmail(),
+    check("password", "La contraseña es obligatoria").notEmpty(),
+    validarCampos,
+  ],
+  login,
+);
 
-
-
-
-export default routerAuth
+export default routerAuth;
