@@ -1,5 +1,22 @@
 import { response, request } from "express";
 import Producto from "../models/producto.js";
+import mongoose from "mongoose";
+
+const obtenerProducto = async (req = request, res = response) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ msg: "ID inválido" });
+  }
+
+  const producto = await Producto.findById(id).populate("categoria", "nombre");
+
+  if (!producto) {
+    return res.status(404).json({ msg: "Producto no encontrado" });
+  }
+
+  res.json({ producto });
+};
 
 //Get para traer todos los productos paginados--------------------
 const obtenerProductos = async (req = request, res = response) => {
@@ -9,38 +26,18 @@ const obtenerProductos = async (req = request, res = response) => {
     query.estado = req.query.estado === "true";
   }
 
-  const productos = await Producto.find(query)
-    .populate("categoria", "nombre")
-    .populate("usuario", "email");
-
-  const total = await Producto.countDocuments(query);
+  const [total, productos] = await Promise.all([
+    Producto.countDocuments(query),
+    Producto.find(query).populate("categoria", "nombre"),
+  ]);
 
   res.json({ total, productos });
 };
 
 //--------------------------------------------------------------
-//obtener un producto por su ID
-const obtenerProducto = async (req = request, res = response) => {
-  const { id } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ msg: "ID inválido" });
-  }
-  const producto = await Producto.findById(id)
-    .populate("categoria", "nombre")
-    .populate("usuario", "email");
-  if (!producto) {
-    return res.status(404).json({ msg: "Producto no encontrado" });
-  }
-
-  res.json({
-    producto,
-  });
-};
 
 const productoPost = async (req, res) => {
-  const { precio, categoria, descripcion, img, stock } = req.body;
-
+  const { precio, categoria, descripcion, img, codigo, stock } = req.body;
   const nombre = req.body.nombre.toUpperCase();
 
   const productoDB = await Producto.findOne({ nombre });
@@ -50,93 +47,89 @@ const productoPost = async (req, res) => {
       msg: `El producto ${productoDB.nombre} ya existe`,
     });
   }
-  //Generar la data a guardar
+
   const data = {
     nombre,
     categoria,
     precio,
     descripcion,
     img,
-    stock,
-    usuario: req.usuario._id,
+    codigo,
+    stock
   };
 
-  const producto = new Producto(data);
-
-  //grabar en la base de datos
   try {
-  const producto = new Producto(req.body);
-  await producto.save();
-  
-  return res.status(201).json({
-    msg: "producto creado con exito",
-    producto});
-  
-} catch (error) {
-  res.status(400).json({
-    msg: "Error al crear producto",
-    error: error.message
-  });
-}
+    const producto = new Producto(data);
+    await producto.save();
+
+    return res.status(201).json({
+      msg: "Producto creado con éxito",
+      producto,
+    });
+  } catch (error) {
+    res.status(400).json({
+      msg: "Error al crear producto",
+      error: error.message,
+    });
+  }
 };
 
 //actualizarProducto (validar nombre)-----------------------------------------
 
+
 const actualizarProducto = async (req = request, res = response) => {
   const { id } = req.params;
-  console.log("ID recibido en backend:", id);
-  const { precio, categoria, descripcion, disponible, estado } = req.body;
 
-  // Buscamos el producto en la base de datos
-  const productoDB = await Producto.findById(id);
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ msg: "ID inválido" });
+  }
 
-  if (!productoDB) {
-    return res.status(404).json({
-      message: `Producto con id ${id} no encontrado`,
+  // Campos permitidos para actualizar
+  const allowedFields = [
+    "nombre",
+    "codigo",
+    "precio",
+    "stock",
+    "descripcion",
+    "img",
+    "categoria",
+    "estado",
+  ];
+
+  // Construir data filtrando solo lo permitido
+  const data = Object.fromEntries(
+    Object.entries(req.body)
+      .filter(([key, value]) => allowedFields.includes(key))
+      .map(([key, value]) => {
+        if (key === "nombre") return [key, value.toUpperCase()];
+        if (key === "codigo") return [key, value.trim()];
+        return [key, value];
+      })
+  );
+
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({
+      msg: "No hay campos válidos para actualizar",
     });
   }
 
-  // Si el estado viene en false, lo cambiamos a true
-  //let nuevoEstado = estado;
-  //if (productoDB.estado === false) {
-    //nuevoEstado = true;
-  //}
-  //guardamos id de usuario
-  const usuario = req.usuario._id;
+  const producto = await Producto.findByIdAndUpdate(id, data, {
+    new: true,
+    runValidators: true,
+  }).populate("categoria", "nombre");
 
-  //creamos la data
-  let data = {
-    precio,
-    descripcion,
-    categoria,
-    disponible,
-    usuario,
-    estado: nuevoEstado,
-  };
-
-  //si viene el nombre al momento de actualizar
-  if (req.body.nombre) {
-    data.nombre = req.body.nombre.toUpperCase();
+  if (!producto) {
+    return res.status(404).json({
+      msg: `Producto con id ${id} no encontrado`,
+    });
   }
-  //si viene el stock en el body
-  if (req.body.stock) {
-    data.stock = req.body.stock;
-  }
-  //si viene la imagen
-  if (req.body.img) {
-    data.img = req.body.img;
-  }
-
-  //actualizamos el producto y lo devolvemos ya con lo actualizamos
-  const producto = await Producto.findByIdAndUpdate(id, data, { new: true })
-    .populate("categoria", "nombre")
-    .populate("usuario", "email");
 
   res.status(200).json({
+    msg: "Producto actualizado correctamente",
     producto,
-    msg: "Producto actualizado!",
   });
 };
+
 
 const borrarProducto = async (req = request, res = response) => {
   const { id } = req.params;
@@ -144,7 +137,7 @@ const borrarProducto = async (req = request, res = response) => {
   const productoBorrado = await Producto.findByIdAndUpdate(
     id,
     { estado: false },
-    { new: true }
+    { new: true },
   );
 
   const { nombre } = productoBorrado;
