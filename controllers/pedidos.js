@@ -9,7 +9,7 @@ const crearPedido = async (req, res) => {
 
   try {
     const vendedor = req.usuario; // viene del middleware JWT
-    const { clienteId, clienteNuevo, items, observaciones } = req.body;
+    const { clienteId, items, observaciones } = req.body;
 
     // 🔐 Validar vendedor
     if (!vendedor) {
@@ -38,6 +38,7 @@ const crearPedido = async (req, res) => {
       cliente = await Cliente.findOne({
         _id: clienteId,
         estado: true,
+        vendedor,
       }).session(session);
 
       if (!cliente) {
@@ -47,19 +48,6 @@ const crearPedido = async (req, res) => {
           .status(404)
           .json({ msg: "Cliente no encontrado o inactivo" });
       }
-    } else if (clienteNuevo) {
-      if (!clienteNuevo.nombre) {
-        await session.abortTransaction();
-        session.endSession();
-        return res
-          .status(400)
-          .json({ msg: "El nombre del cliente es obligatorio" });
-      }
-
-      cliente = new Cliente({
-        ...clienteNuevo,
-        vendedor,
-      });
 
       await cliente.save({ session });
     } else {
@@ -217,7 +205,5 @@ const obtenerPedidosVendedor = async (req, res) => {
     });
   }
 };
-
-
 
 export { crearPedido, obtenerPedidosAdmin, obtenerPedidosVendedor };

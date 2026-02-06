@@ -1,30 +1,44 @@
 import { response, request } from "express";
 import mongoose from "mongoose";
+import Cliente from "../models/cliente.js";
 
 const { ObjectId } = mongoose.Types;
 
-import Cliente from "../models/cliente.js";
-
 const buscarCliente = async (req = request, res = response) => {
   const { termino } = req.params;
+  const vendedor = req.usuario; // ✅ CONSISTENTE
 
-  const isMongoId = ObjectId.isValid(termino);
-  if (isMongoId) {
-    const cliente = await Cliente.findById(termino);
-    return res.json({
-      results: cliente ? [cliente] : [],
+  if (!vendedor) {
+    return res.status(401).json({
+      msg: "Usuario no autenticado",
     });
   }
-   // 🔍 Buscar SOLO por nombre
+
+  const isMongoId = ObjectId.isValid(termino);
+
+  if (isMongoId) {
+    const cliente = await Cliente.findOne({
+      _id: termino,
+      vendedor,
+      estado: true,
+    });
+
+    return res.json({
+      clientes: cliente ? [cliente] : [],
+    });
+  }
+
   const regex = new RegExp(termino, "i");
 
   const clientes = await Cliente.find({
     estado: true,
+    vendedor,       // 🔥 AHORA SÍ
     nombre: regex,
   }).limit(10);
 
   res.json({
-    results: clientes,
+    clientes,
   });
 };
+
 export default buscarCliente;
