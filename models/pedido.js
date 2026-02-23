@@ -21,8 +21,12 @@ const PedidoSchema = new Schema(
           ref: "Producto",
           required: true,
         },
-        nombre: String, // snapshot para Excel
-        precio: Number, // precio al momento del pedido
+        codigo: {
+          type: String,
+          trim: true,
+        },
+        nombre: String,
+        precio: Number,
         cantidad: {
           type: Number,
           required: true,
@@ -31,7 +35,6 @@ const PedidoSchema = new Schema(
         subtotal: Number,
       },
     ],
-
     total: {
       type: Number,
       default: 0,
@@ -50,7 +53,7 @@ const PedidoSchema = new Schema(
   },
   {
     timestamps: true, // createdAt = fecha y hora exacta
-  }
+  },
 );
 
 export default model("Pedido", PedidoSchema);
