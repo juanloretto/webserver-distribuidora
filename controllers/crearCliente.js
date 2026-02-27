@@ -3,7 +3,8 @@ import Cliente from "../models/cliente.js";
 export const crearCliente = async (req, res) => {
   try {
     const vendedor = req.usuario; // viene del middleware JWT
-    const { nombre, direccion, telefono } = req.body;
+    const { nombre, razonSocial, direccion, localidad, telefono, cuit, email } =
+      req.body;
 
     if (!vendedor) {
       return res.status(401).json({
@@ -35,9 +36,13 @@ export const crearCliente = async (req, res) => {
     // 3️⃣ Crear cliente
     const cliente = new Cliente({
       nombre: nombre.trim(),
+      razonSocial,
       direccion,
+      localidad,
       telefono,
       vendedor,
+      cuit,
+      email,
     });
 
     await cliente.save();

@@ -5,14 +5,38 @@ const ClienteSchema = new Schema(
     nombre: {
       type: String,
       required: [true, "El nombre del cliente es obligatorio"],
+      trim: true,
+    },
+
+    razonSocial: {
+      type: String,
+      trim: true,
     },
 
     direccion: {
       type: String,
+      trim: true,
+    },
+
+    localidad: {
+      type: String,
+      trim: true,
     },
 
     telefono: {
       type: String,
+      trim: true,
+    },
+
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+    },
+
+    cuit: {
+      type: String,
+      trim: true,
     },
 
     vendedor: {
@@ -27,7 +51,7 @@ const ClienteSchema = new Schema(
     },
   },
   {
-    timestamps: true, 
+    timestamps: true,
   }
 );
 

@@ -18,7 +18,7 @@ const getUsers = async (req = request, res = response) => {
 
 //obtener usuario por id
 const getUser = async (req, res = response) => {
-   const usuarioAuth = req.usuario;
+  const usuarioAuth = req.usuario;
   try {
     const { id } = req.params;
     const usuario = await Usuario.findById(id);
@@ -28,10 +28,7 @@ const getUser = async (req, res = response) => {
         .status(404)
         .json({ msg: `Usuario con id ${id} no encontrado` });
     }
-        if (
-      usuarioAuth.rol !== "ADMIN_ROLE" &&  
-      usuarioAuth._id.toString() !== id
-    ) {
+    if (usuarioAuth.rol !== "ADMIN_ROLE" && usuarioAuth._id.toString() !== id) {
       return res.status(403).json({
         msg: "No tenés permisos para ver este usuario",
       });
@@ -119,6 +116,13 @@ const putUsers = async (req, res) => {
 const deleteUsers = async (req = request, res = response) => {
   try {
     const { id } = req.params;
+    const usuarioAuth = req.usuario;
+
+    if (usuarioAuth._id.toString() === id) {
+      return res.status(400).json({
+        msg: "No puedes eliminar tu propio usuario",
+      });
+    }
 
     // Inactivar usuario
     const usuarioBorrado = await Usuario.findByIdAndUpdate(
