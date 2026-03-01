@@ -39,26 +39,28 @@ const obtenerProductos = async (req = request, res = response) => {
 const productoPost = async (req, res) => {
   const { precio, categoria, descripcion, img, codigo, stock } = req.body;
   const nombre = req.body.nombre.toUpperCase();
-
-  const productoDB = await Producto.findOne({ nombre });
-
-  if (productoDB) {
-    return res.status(400).json({
-      msg: `El producto ${productoDB.nombre} ya existe`,
-    });
-  }
-
-  const data = {
-    nombre,
-    categoria,
-    precio,
-    descripcion,
-    img,
-    codigo,
-    stock
-  };
+  const codigoNormalizado = codigo.trim();
 
   try {
+    // Validar por código, no por nombre
+    const productoDB = await Producto.findOne({ codigo: codigoNormalizado });
+
+    if (productoDB) {
+      return res.status(400).json({
+        msg: `Ya existe un producto con el código ${productoDB.codigo}`,
+      });
+    }
+
+    const data = {
+      nombre,
+      categoria,
+      precio,
+      descripcion,
+      img,
+      codigo: codigoNormalizado,
+      stock,
+    };
+
     const producto = new Producto(data);
     await producto.save();
 
@@ -73,9 +75,7 @@ const productoPost = async (req, res) => {
     });
   }
 };
-
 //actualizarProducto (validar nombre)-----------------------------------------
-
 
 const actualizarProducto = async (req = request, res = response) => {
   const { id } = req.params;
@@ -104,7 +104,7 @@ const actualizarProducto = async (req = request, res = response) => {
         if (key === "nombre") return [key, value.toUpperCase()];
         if (key === "codigo") return [key, value.trim()];
         return [key, value];
-      })
+      }),
   );
 
   if (Object.keys(data).length === 0) {
@@ -129,7 +129,6 @@ const actualizarProducto = async (req = request, res = response) => {
     producto,
   });
 };
-
 
 const borrarProducto = async (req = request, res = response) => {
   const { id } = req.params;

@@ -26,8 +26,8 @@ const exportarPedidoExcel = async (req, res) => {
 
     // 📊 CABECERA TABLA
     worksheet.addRow([
-      "ID Producto",
-      "Nombre Producto",
+      "Articulo",
+      "Referencia",
       "Cantidad",
       "Precio",
       "Subtotal",
@@ -38,7 +38,7 @@ const exportarPedidoExcel = async (req, res) => {
     // 📦 ITEMS
     pedido.items.forEach((item) => {
       worksheet.addRow([
-        item.producto._id.toString(),
+        item.producto.codigo || "SIN CÓDIGO",
         item.producto.nombre,
         item.cantidad,
         item.precio,
@@ -47,33 +47,44 @@ const exportarPedidoExcel = async (req, res) => {
     });
 
     // 📐 ANCHOS
-   worksheet.columns.forEach((column) => {
-    let maxLength = 10;
+    worksheet.columns.forEach((column) => {
+      let maxLength = 10;
 
-    column.eachCell({ includeEmpty: true }, (cell) => {
-      const cellLength = cell.value
-        ? cell.value.toString().length
-        : 0;
-      if (cellLength > maxLength) {
-        maxLength = cellLength;
-      }
+      column.eachCell({ includeEmpty: true }, (cell) => {
+        const cellLength = cell.value ? cell.value.toString().length : 0;
+        if (cellLength > maxLength) {
+          maxLength = cellLength;
+        }
+      });
+
+      column.width = maxLength + 2;
     });
-
-    column.width = maxLength + 2;
-  });
 
     // 📤 RESPONSE
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=pedido_${pedido._id}.xlsx`
+      `attachment; filename=pedido_${pedido._id}.xlsx`,
     );
 
-    await workbook.xlsx.write(res);
-    res.end();
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=pedido_${pedido._id}.xlsx`,
+    );
+
+    res.setHeader("Content-Length", buffer.length);
+
+    res.send(buffer);
   } catch (error) {
     console.error("❌ Error exportando pedido:", error);
     res.status(500).json({

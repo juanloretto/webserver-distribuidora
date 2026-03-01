@@ -1,5 +1,6 @@
 import { Router } from "express";
 import exportarPedidosExcel from "../controllers/exportarPedidosExcel.js";
+import { obtenerPedidosAdmin } from "../controllers/obtenerPedidos.js";
 import { metricasPedidos } from "../controllers/metricasPedido.js";
 import { cambiarEstadoPedido } from "../controllers/cambiarEstadoPedido.js";
 import { cancelarPedido } from "../controllers/cancelarPedido.js";
@@ -10,14 +11,13 @@ import { esAdminRole } from "../middlewares/validar-roles.js";
 
 const routerPedido = Router();
 
-
 routerPedido.get(
   "/exportar/excel/:id",
   [validarJWT, esAdminRole],
   exportarPedidosExcel,
 );
 
-//uterPedido.get("/", [validarJWT, esAdminRole], obtenerPedidosAdmin);
+routerPedido.get("/admin", [validarJWT, esAdminRole], obtenerPedidosAdmin);
 
 //routerPedido.get("/vendedor", validarJWT, obtenerPedidosVendedor);
 
