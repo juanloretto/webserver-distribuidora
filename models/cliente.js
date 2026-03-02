@@ -7,7 +7,6 @@ const ClienteSchema = new Schema(
       required: [true, "El nombre del cliente es obligatorio"],
       trim: true,
     },
-
     razonSocial: {
       type: String,
       trim: true,
@@ -52,7 +51,11 @@ const ClienteSchema = new Schema(
   },
   {
     timestamps: true,
-  }
+  },
+);
+ClienteSchema.index(
+  { vendedor: 1, estado: 1, nombre: 1 },
+  { collation: { locale: "es", strength: 1 } }
 );
 
 export default model("Cliente", ClienteSchema);

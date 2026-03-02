@@ -20,18 +20,40 @@ const obtenerProducto = async (req = request, res = response) => {
 
 //Get para traer todos los productos paginados--------------------
 const obtenerProductos = async (req = request, res = response) => {
-  let query = {};
+  try {
+    const { limite = 12, desde = 0, termino = "", estado = "true" } = req.query;
 
-  if (req.query.estado !== undefined) {
-    query.estado = req.query.estado === "true";
+    const query = {
+      estado: estado === "true",
+    };
+
+    // 🔎 Filtro por búsqueda si viene término
+    if (termino) {
+      const regex = new RegExp(termino, "i");
+      query.$or = [{ nombre: regex }, { codigo: regex }];
+    }
+
+    const [total, productos] = await Promise.all([
+      Producto.countDocuments(query),
+      Producto.find(query)
+        .populate("categoria", "nombre")
+        .skip(Number(desde))
+        .limit(Number(limite))
+        .sort({ nombre: 1 }),
+    ]);
+
+    res.json({
+      total,
+      paginaActual: Math.floor(desde / limite) + 1,
+      totalPaginas: Math.ceil(total / limite),
+      productos,
+    });
+  } catch (error) {
+    res.status(500).json({
+      msg: "Error al obtener productos",
+      error: error.message,
+    });
   }
-
-  const [total, productos] = await Promise.all([
-    Producto.countDocuments(query),
-    Producto.find(query).populate("categoria", "nombre"),
-  ]);
-
-  res.json({ total, productos });
 };
 
 //--------------------------------------------------------------

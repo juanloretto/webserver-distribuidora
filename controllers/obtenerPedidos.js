@@ -12,10 +12,10 @@ const obtenerPedidosAdmin = async (req, res) => {
     }
 
     const page = Number(req.query.page) || 1;
+    const { estado, cliente, fechaDesde, fechaHasta } = req.query;
     const limit = Number(req.query.limit) || 25;
     const skip = (page - 1) * limit;
 
-    const { estado, cliente } = req.query;
     const normalizarTexto = (texto) => {
       return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     };
@@ -24,13 +24,25 @@ const obtenerPedidosAdmin = async (req, res) => {
     if (estado) {
       filtro.estado = estado;
     }
+    if (fechaDesde || fechaHasta) {
+      filtro.createdAt = {};
+
+      if (fechaDesde) {
+        filtro.createdAt.$gte = new Date(fechaDesde);
+      }
+
+      if (fechaHasta) {
+        const fechaFinal = new Date(fechaHasta);
+        fechaFinal.setHours(23, 59, 59, 999); // 🔥 Incluye todo el día
+        filtro.createdAt.$lte = fechaFinal;
+      }
+    }
 
     // 🔥 BUSQUEDA SIN TILDES
     if (cliente) {
       const clienteNormalizado = normalizarTexto(cliente);
 
       const clientes = await Cliente.find().select("_id nombre");
-
       const clientesFiltrados = clientes.filter((c) =>
         normalizarTexto(c.nombre)
           .toLowerCase()
@@ -68,4 +80,60 @@ const obtenerPedidosAdmin = async (req, res) => {
   }
 };
 
-export { obtenerPedidosAdmin };
+//OBTENER PEDIDOS POR VENDEDOR
+const obtenerMisPedidos = async (req, res) => {
+  try {
+    const usuario = req.usuario;
+
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const { cliente } = req.query;
+
+    const normalizarTexto = (texto) =>
+      texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    let filtro = {
+      vendedor: usuario._id, // 🔥 SOLO SUS PEDIDOS
+    };
+
+    if (cliente) {
+      const clienteNormalizado = normalizarTexto(cliente);
+
+      const clientes = await Cliente.find().select("_id nombre");
+
+      const clientesFiltrados = clientes.filter((c) =>
+        normalizarTexto(c.nombre)
+          .toLowerCase()
+          .includes(clienteNormalizado.toLowerCase()),
+      );
+
+      const clientesIds = clientesFiltrados.map((c) => c._id);
+
+      filtro.cliente = { $in: clientesIds };
+    }
+
+    const total = await Pedido.countDocuments(filtro);
+
+    const pedidos = await Pedido.find(filtro)
+      .populate("cliente", "nombre")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.json({
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      pedidos,
+    });
+  } catch (error) {
+    console.error("❌ Error al obtener mis pedidos:", error);
+    res.status(500).json({
+      msg: "Error al obtener pedidos",
+      error: error.message,
+    });
+  }
+};
+
+export { obtenerPedidosAdmin, obtenerMisPedidos };

@@ -6,7 +6,7 @@ const { ObjectId } = mongoose.Types;
 
 const buscarCliente = async (req = request, res = response) => {
   const { termino } = req.params;
-  const vendedor = req.usuario; // ✅ CONSISTENTE
+  const vendedor = req.usuario;
 
   if (!vendedor) {
     return res.status(401).json({
@@ -32,9 +32,11 @@ const buscarCliente = async (req = request, res = response) => {
 
   const clientes = await Cliente.find({
     estado: true,
-    vendedor,       // 🔥 AHORA SÍ
+    vendedor,
     nombre: regex,
-  }).limit(10);
+  })
+    .collation({ locale: "es", strength: 1 }) // 🔥 IGNORA TILDES
+    .limit(10);
 
   res.json({
     clientes,

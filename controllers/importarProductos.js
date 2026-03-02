@@ -10,7 +10,6 @@ export const importarProductos = async (req, res) => {
       return res.status(400).json({ msg: "No se envió ningún archivo" });
     }
 
-    // Función para normalizar texto y comparaciones
     const normalizar = (texto) =>
       texto
         ?.normalize("NFD")
@@ -21,44 +20,45 @@ export const importarProductos = async (req, res) => {
     const productos = [];
     const errores = [];
 
-    // 1️⃣ Traer todas las categorías existentes y crear mapa
+    // Traer todas las categorías existentes
     const categoriasDB = await Categoria.find();
     const mapaCategorias = {};
     categoriasDB.forEach((cat) => {
       mapaCategorias[normalizar(cat.nombre)] = cat._id;
     });
 
-    // 2️⃣ Leer CSV
     fs.createReadStream(req.file.path)
       .pipe(
         csv({
-          headers: ["Articulo", "Descripcion", "Rubro", "CON EL 20%", "Stock"],
-          skipLines: 1, // Salta encabezado
+          headers: [
+            "Articulo",
+            "Descripcion",
+            "Rubro",
+            "CON EL 20%",
+            "Stock",
+            "img",
+          ],
+          skipLines: 1,
         }),
       )
       .on("data", async (row) => {
         try {
-          // Ignorar fila de encabezado si quedó
           if (row.Articulo === "Articulo") return;
-
           if (!row.Articulo || !row.Descripcion) {
             errores.push({ row, error: "Faltan datos obligatorios" });
             return;
           }
 
-          // 3️⃣ Procesar categoría
           const rubro = normalizar(row.Rubro);
           let categoriaId = mapaCategorias[rubro];
 
-          // Crear categoría si no existe
           if (!categoriaId && rubro) {
             try {
               const nuevaCategoria = new Categoria({ nombre: rubro });
               await nuevaCategoria.save();
               categoriaId = nuevaCategoria._id;
-              mapaCategorias[rubro] = categoriaId; // actualizar mapa
+              mapaCategorias[rubro] = categoriaId;
             } catch (err) {
-              // Si falla por duplicado (otra importación paralela), buscar la categoría
               const catExistente = await Categoria.findOne({ nombre: rubro });
               if (catExistente) {
                 categoriaId = catExistente._id;
@@ -78,14 +78,12 @@ export const importarProductos = async (req, res) => {
             return;
           }
 
-          // 4️⃣ Parsear precio
           const precio = parsePrecio(row["CON EL 20%"]);
           if (precio === null) {
             errores.push({ row, error: "Precio inválido" });
             return;
           }
 
-          // 5️⃣ Parsear stock
           const stock = row.Stock
             ? parseInt(row.Stock.replace(/\D/g, ""), 10)
             : 0;
@@ -94,36 +92,42 @@ export const importarProductos = async (req, res) => {
             return;
           }
 
-          // 6️⃣ Preparar operación bulkWrite
-          productos.push({
-            updateOne: {
-              filter: { codigo: row.Articulo.trim() },
-              update: {
-                $set: {
-                  codigo: row.Articulo.trim(),
-                  nombre: row.Descripcion.trim(),
-                  descripcion: row.Descripcion.trim(),
-                  categoria: categoriaId,
-                  precio,
-                  stock,
-                  estado: true,
+          // 🔹 Guardar la URL de la imagen directamente
+          const imagen =
+            row.img && row.img.trim() !== ""
+              ? row.img.replace(/(^"|"$)/g, "").trim()
+              : "/placeholder.png";
+          if (row.Articulo && row.Descripcion && categoriaId) {
+            productos.push({
+              updateOne: {
+                filter: { codigo: row.Articulo.trim() },
+                update: {
+                  $set: {
+                    codigo: row.Articulo.trim(),
+                    nombre: row.Descripcion.trim(),
+                    descripcion: row.Descripcion.trim(),
+                    categoria: categoriaId,
+                    precio,
+                    stock,
+                    estado: true,
+                    img: imagen, // ✅ guardamos la URL
+                  },
                 },
+                upsert: true,
               },
-              upsert: true,
-            },
-          });
+            });
+          }
         } catch (err) {
           errores.push({ row, error: err.message });
         }
       })
       .on("end", async () => {
         try {
-          // Ejecutar bulkWrite si hay productos
           if (productos.length > 0) {
             await Producto.bulkWrite(productos);
           }
 
-          fs.unlinkSync(req.file.path); // borrar CSV
+          fs.unlinkSync(req.file.path);
 
           res.json({
             totalProcesados: productos.length,

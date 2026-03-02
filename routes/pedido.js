@@ -1,6 +1,6 @@
 import { Router } from "express";
 import exportarPedidosExcel from "../controllers/exportarPedidosExcel.js";
-import { obtenerPedidosAdmin } from "../controllers/obtenerPedidos.js";
+import { obtenerMisPedidos, obtenerPedidosAdmin } from "../controllers/obtenerPedidos.js";
 import { metricasPedidos } from "../controllers/metricasPedido.js";
 import { cambiarEstadoPedido } from "../controllers/cambiarEstadoPedido.js";
 import { cancelarPedido } from "../controllers/cancelarPedido.js";
@@ -19,7 +19,7 @@ routerPedido.get(
 
 routerPedido.get("/admin", [validarJWT, esAdminRole], obtenerPedidosAdmin);
 
-//routerPedido.get("/vendedor", validarJWT, obtenerPedidosVendedor);
+routerPedido.get("/mis-pedidos", validarJWT, obtenerMisPedidos);
 
 routerPedido.post("/", [validarJWT, validarCampos], crearPedido);
 
