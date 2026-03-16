@@ -22,9 +22,25 @@ routerProd.get("/", validarJWT, obtenerProductos);
 
 routerProd.post(
   "/importar",
+  (req, res, next) => {
+    console.log("📌 Entró a /productos/importar");
+    next();
+  },
   validarJWT,
+  (req, res, next) => {
+    console.log("✅ Pasó validarJWT");
+    next();
+  },
   esAdminRole,
+  (req, res, next) => {
+    console.log("✅ Pasó esAdminRole");
+    next();
+  },
   upload.single("archivo"),
+  (req, res, next) => {
+    console.log("📎 Archivo recibido por multer:", req.file);
+    next();
+  },
   importarProductos,
 );
 //Listar producto por id

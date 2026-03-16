@@ -9,7 +9,9 @@ const obtenerProducto = async (req = request, res = response) => {
     return res.status(400).json({ msg: "ID inválido" });
   }
 
-  const producto = await Producto.findById(id).populate("categoria", "nombre");
+  const producto = await Producto.findById(id)
+    .select("-stock")
+    .populate("categoria", "nombre");
 
   if (!producto) {
     return res.status(404).json({ msg: "Producto no encontrado" });
@@ -18,7 +20,7 @@ const obtenerProducto = async (req = request, res = response) => {
   res.json({ producto });
 };
 
-//Get para traer todos los productos paginados--------------------
+// Get para traer todos los productos paginados
 const obtenerProductos = async (req = request, res = response) => {
   try {
     const { limite = 12, desde = 0, termino = "", estado = "true" } = req.query;
@@ -27,7 +29,6 @@ const obtenerProductos = async (req = request, res = response) => {
       estado: estado === "true",
     };
 
-    // 🔎 Filtro por búsqueda si viene término
     if (termino) {
       const regex = new RegExp(termino, "i");
       query.$or = [{ nombre: regex }, { codigo: regex }];
@@ -36,6 +37,7 @@ const obtenerProductos = async (req = request, res = response) => {
     const [total, productos] = await Promise.all([
       Producto.countDocuments(query),
       Producto.find(query)
+        .select("-stock")
         .populate("categoria", "nombre")
         .skip(Number(desde))
         .limit(Number(limite))
@@ -56,15 +58,12 @@ const obtenerProductos = async (req = request, res = response) => {
   }
 };
 
-//--------------------------------------------------------------
-
 const productoPost = async (req, res) => {
   const { precio, categoria, descripcion, img, codigo, stock } = req.body;
   const nombre = req.body.nombre.toUpperCase();
   const codigoNormalizado = codigo.trim();
 
   try {
-    // Validar por código, no por nombre
     const productoDB = await Producto.findOne({ codigo: codigoNormalizado });
 
     if (productoDB) {
@@ -97,7 +96,6 @@ const productoPost = async (req, res) => {
     });
   }
 };
-//actualizarProducto (validar nombre)-----------------------------------------
 
 const actualizarProducto = async (req = request, res = response) => {
   const { id } = req.params;
@@ -106,7 +104,6 @@ const actualizarProducto = async (req = request, res = response) => {
     return res.status(400).json({ msg: "ID inválido" });
   }
 
-  // Campos permitidos para actualizar
   const allowedFields = [
     "nombre",
     "codigo",
@@ -118,10 +115,9 @@ const actualizarProducto = async (req = request, res = response) => {
     "estado",
   ];
 
-  // Construir data filtrando solo lo permitido
   const data = Object.fromEntries(
     Object.entries(req.body)
-      .filter(([key, value]) => allowedFields.includes(key))
+      .filter(([key]) => allowedFields.includes(key))
       .map(([key, value]) => {
         if (key === "nombre") return [key, value.toUpperCase()];
         if (key === "codigo") return [key, value.trim()];
@@ -138,7 +134,9 @@ const actualizarProducto = async (req = request, res = response) => {
   const producto = await Producto.findByIdAndUpdate(id, data, {
     new: true,
     runValidators: true,
-  }).populate("categoria", "nombre");
+  })
+    .select("-stock")
+    .populate("categoria", "nombre");
 
   if (!producto) {
     return res.status(404).json({
@@ -154,12 +152,12 @@ const actualizarProducto = async (req = request, res = response) => {
 
 const borrarProducto = async (req = request, res = response) => {
   const { id } = req.params;
-  //la actualizacion es cambiar el estado a false
+
   const productoBorrado = await Producto.findByIdAndUpdate(
     id,
     { estado: false },
     { new: true },
-  );
+  ).select("-stock");
 
   const { nombre } = productoBorrado;
 
@@ -169,18 +167,6 @@ const borrarProducto = async (req = request, res = response) => {
     productoBorrado,
   });
 };
-//para borrar productos en un estado en false
-// const borrarProductos = async (req, res) => {
-
-//   const query={estado:false}
-
-//   await Producto.findAndRemove(query)
-
-//    res.status(200).json({
-//     msg: "Se borraron todos los productos inactivos",
-
-//   });
-// };
 
 export {
   productoPost,

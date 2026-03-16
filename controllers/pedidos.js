@@ -3,6 +3,8 @@ import Producto from "../models/producto.js";
 import Pedido from "../models/pedido.js";
 import mongoose from "mongoose";
 
+const redondear2 = (numero) => Number(Number(numero).toFixed(2));
+
 const crearPedido = async (req, res) => {
   console.log("🚀 1 - Entró a crearPedido");
 
@@ -17,7 +19,6 @@ const crearPedido = async (req, res) => {
     console.log("📦 3 - Body recibido:", req.body);
     console.log("👤 4 - Usuario:", vendedor);
 
-    // 🔐 Validar vendedor
     if (!vendedor) {
       console.log("⛔ 5 - No hay vendedor");
       await session.abortTransaction();
@@ -25,7 +26,6 @@ const crearPedido = async (req, res) => {
       return res.status(401).json({ msg: "Usuario no autenticado" });
     }
 
-    // 1️⃣ Validar items
     if (!Array.isArray(items) || items.length === 0) {
       console.log("⛔ 6 - Items inválidos:", items);
       await session.abortTransaction();
@@ -33,7 +33,6 @@ const crearPedido = async (req, res) => {
       return res.status(400).json({ msg: "El pedido debe tener productos" });
     }
 
-    // 2️⃣ Resolver cliente
     let cliente;
 
     if (clienteId) {
@@ -69,7 +68,6 @@ const crearPedido = async (req, res) => {
       return res.status(400).json({ msg: "Debe indicar un cliente" });
     }
 
-    // 3️⃣ Procesar productos
     const snapshotItems = [];
     let total = 0;
 
@@ -78,17 +76,21 @@ const crearPedido = async (req, res) => {
     for (const item of items) {
       console.log("🔄 13 - Procesando item:", item);
 
-      const { productoId, cantidad } = item;
+      const { productoId, cantidad, lista } = item;
 
       if (
         !mongoose.Types.ObjectId.isValid(productoId) ||
         !Number.isInteger(cantidad) ||
-        cantidad < 1
+        cantidad < 1 ||
+        !lista ||
+        typeof lista !== "string"
       ) {
-        console.log("⛔ 14 - Producto o cantidad inválida", item);
+        console.log("⛔ 14 - Producto, cantidad o lista inválida", item);
         await session.abortTransaction();
         session.endSession();
-        return res.status(400).json({ msg: "Producto o cantidad inválida" });
+        return res
+          .status(400)
+          .json({ msg: "Producto, cantidad o lista inválida" });
       }
 
       const producto = await Producto.findOne({
@@ -105,31 +107,34 @@ const crearPedido = async (req, res) => {
         return res.status(404).json({ msg: "Producto no disponible" });
       }
 
-      if (producto.stock < cantidad) {
-        console.log("⛔ 17 - Stock insuficiente");
+      const listaElegida = producto.listasPrecios?.find(
+        (l) => l.nombre.trim().toUpperCase() === lista.trim().toUpperCase(),
+      );
+
+      if (!listaElegida) {
+        console.log("⛔ 17 - Lista no encontrada en el producto");
         await session.abortTransaction();
         session.endSession();
         return res.status(400).json({
-          msg: `Stock insuficiente para ${producto.nombre}`,
+          msg: `La lista ${lista} no existe para ${producto.nombre}`,
         });
       }
 
-      const subtotal = producto.precio * cantidad;
-      total += subtotal;
+      const precioUnitario = redondear2(listaElegida.precio);
+      const subtotal = redondear2(precioUnitario * cantidad);
+      total = redondear2(total + subtotal);
 
       snapshotItems.push({
         producto: producto._id,
         codigo: producto.codigo,
         nombre: producto.nombre,
-        precio: producto.precio,
+        lista: listaElegida.nombre,
+        precioUnitario,
         cantidad,
         subtotal,
       });
 
-      producto.stock -= cantidad;
-      await producto.save({ session });
-
-      console.log("✅ 18 - Producto guardado con nuevo stock");
+      console.log("✅ 18 - Item agregado al pedido");
     }
 
     console.log("💰 19 - Total calculado:", total);
@@ -182,4 +187,5 @@ const crearPedido = async (req, res) => {
     });
   }
 };
+
 export { crearPedido };
